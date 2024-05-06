@@ -43,9 +43,9 @@ class TestUtils(unittest.TestCase):
 
     def test_stripNonASCII(self):
         cases = [
-            ("Hellö, Wörld!", "Hell, Wrld!"),
-            ("naïve façade", "naive faade"),
-            ("café—bar", "cafbar"),
+            ("Hellö, Wörld!", "Helloe, Woerld!"),
+            ("naïve façade", "naive facade"),
+            ("café—bar", "cafebar"),
             ("", ""),
         ]
         for input_str, expected in cases:
