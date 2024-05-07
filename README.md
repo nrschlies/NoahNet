@@ -1,3 +1,22 @@
+# NoahNet: Building a Customized GPT-like Network from Scratch
+
+## Introduction
+NoahNet is a project aimed at creating a custom GPT-like neural network from scratch. This README.md file provides an overview of the Byte Pair Encoding (BPE) implementation and text utilities as part of the NoahNet project.
+
+## Byte Pair Encoding (BPE)
+Byte Pair Encoding is a data compression technique used for tokenization in natural language processing tasks. The `byte_pair_encoding.hpp` and `byte_pair_encoding.cpp` files contain the implementation of BPE functionalities. The key components of BPE include:
+
+- `BytePairEncoding::train(const std::vector<std::string>& texts)`: A method to train the BPE model using a corpus of texts.
+- `BytePairEncoding::encode(const std::string& text)`: A method to encode text using the trained BPE model.
+- `BytePairEncoding::decode(const std::vector<std::string>& tokens)`: A method to decode tokens back to text.
+- `BytePairEncoding::add_to_vocab(const std::string& token)`: A method to add tokens to the vocabulary.
+- `BytePairEncoding::update_vocab_with_pair(const std::string& best_pair_a, const std::string& best_pair_b)`: A method to update the vocabulary with the best pair of tokens.
+- `BytePairEncoding::tokenize(const std::string& text)`: A method to tokenize text using BPE.
+
+### Example: BPE
+Suppose we have the following corpus of texts:
+["Hello world", "This is a test", "NoahNet is awesome"]
+
 By applying BPE, we can observe the following tokenization:
 
 - Initial Vocabulary: `{"Hello", "world", "This", "is", "a", "test", "NoahNet", "awesome"}`
