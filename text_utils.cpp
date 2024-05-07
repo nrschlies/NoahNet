@@ -10,7 +10,6 @@
 
 extern "C" {
     __attribute__((visibility("default")))
-    
     const char* toLowerCase(const char* str) {
         static std::string utf8Result;
         std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;

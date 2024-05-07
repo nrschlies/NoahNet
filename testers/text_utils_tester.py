@@ -56,7 +56,7 @@ class TestUtils(unittest.TestCase):
             ("...Leading", "Leading"),  # Leading ellipsis
             ("trailing!!!", "trailing"),  # Trailing exclamations
             ("punctuation, inside; text.", "punctuation inside text"),  # Mixed punctuation
-             ("He said, 'Hello, world!'", "He said Hello world"),  # Embedded single quotes and commas
+            ("He said, 'Hello, world!'", "He said Hello world"),  # Embedded single quotes and commas
             ("x^2 + y^2 = z^2; solve for z.", "x2  y2  z2 solve for z")  # Mathematical expression
         ]
         for input_str, expected in cases:
