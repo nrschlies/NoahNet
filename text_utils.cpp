@@ -1,120 +1,88 @@
 #include "text_utils.hpp"
-
 #include <algorithm>
 #include <cctype>
 #include <sstream>
 #include <iostream>
 #include <locale>
 #include <codecvt>
-#include <unordered_map>
 #include <string>
-
-
-
+#include <unordered_map>
 
 extern "C" {
+    __attribute__((visibility("default")))
+    
+    const char* toLowerCase(const char* str) {
+        static std::string utf8Result;
+        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+        std::wstring wideStr = converter.from_bytes(str);
 
-const char* toLowerCase(const char* str) {
-    static std::string lowerCaseStr;
-    lowerCaseStr.clear();
-    while (*str) {
-        lowerCaseStr += std::tolower((unsigned char)*str);
-        str++;
-    }
-    return lowerCaseStr.c_str();
-}
-
-const char* removePunctuation(const char* str) {
-    static std::string noPunct;
-    noPunct.clear();
-    while (*str) {
-        if (!std::ispunct((unsigned char)*str)) {
-            noPunct += *str;
+        // Convert characters to lowercase using the specified locale
+        for (auto& c : wideStr) {
+            c = std::tolower(c, std::locale("en_US.UTF-8"));
         }
-        str++;
-    }
-    return noPunct.c_str();
-}
 
-const char* tokenize(const char* str) {
-    static std::string tokens;
-    std::istringstream iss(str);
-    std::string token;
-    tokens.clear();
-    try {
-        while (iss >> token) {
-            tokens += token + " ";  // Simplified tokenization output for C interface
+        utf8Result = converter.to_bytes(wideStr);
+        return utf8Result.c_str();
+    }
+
+    const char* normalizeWhitespace(const char* str) {
+        static std::string normalized;
+        normalized.clear();
+        std::string temp(str);
+        bool lastWasSpace = true;
+        for (char& c : temp) {
+            if (std::isspace(static_cast<unsigned char>(c))) {
+                if (!lastWasSpace) {
+                    normalized += ' ';
+                    lastWasSpace = true;
+                }
+            } else {
+                normalized += c;
+                lastWasSpace = false;
+            }
         }
-    } catch (const std::exception& e) {
-        std::cerr << "Error tokenizing string: " << e.what() << '\n';
-        return "";
-    }
-    return tokens.c_str();
-}
-
-const char* stripNonASCII(const char* str) {
-    static std::string asciiStr;
-    asciiStr.clear();
-    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-    std::wstring wideStr = converter.from_bytes(str);
-
-    // Map of common accented characters to ASCII
-    std::unordered_map<wchar_t, std::string> accents = {
-    // Lowercase
-    {L'ä', "ae"}, {L'á', "a"}, {L'ă', "a"}, {L'â', "a"},
-    {L'à', "a"}, {L'ã', "a"}, {L'ā', "a"},
-    {L'ö', "oe"}, {L'ó', "o"}, {L'ô', "o"}, {L'ò', "o"},
-    {L'ø', "oe"}, {L'õ', "o"}, {L'ō', "o"},
-    {L'ü', "ue"}, {L'ú', "u"}, {L'û', "u"}, {L'ù', "u"},
-    {L'ç', "c"}, {L'č', "c"}, {L'ć', "c"},
-    {L'é', "e"}, {L'ě', "e"}, {L'è', "e"}, {L'ê', "e"},
-    {L'í', "i"}, {L'î', "i"}, {L'ï', "i"}, {L'ì', "i"},
-    {L'ñ', "n"}, {L'ń', "n"},
-    {L'ß', "ss"}, {L'ś', "s"}, {L'š', "s"},
-    {L'ý', "y"}, {L'ÿ', "y"}, {L'ź', "z"}, {L'ž', "z"}, {L'ż', "z"},
-    // Uppercase
-    {L'Ä', "Ae"}, {L'Á', "A"}, {L'Ă', "A"}, {L'Â', "A"},
-    {L'À', "A"}, {L'Ã', "A"}, {L'Ā', "A"},
-    {L'Ö', "Oe"}, {L'Ó', "O"}, {L'Ô', "O"}, {L'Ò', "O"},
-    {L'Ø', "Oe"}, {L'Õ', "O"}, {L'Ō', "O"},
-    {L'Ü', "Ue"}, {L'Ú', "U"}, {L'Û', "U"}, {L'Ù', "U"},
-    {L'Ç', "C"}, {L'Č', "C"}, {L'Ć', "C"},
-    {L'É', "E"}, {L'Ě', "E"}, {L'È', "E"}, {L'Ê', "E"},
-    {L'Í', "I"}, {L'Î', "I"}, {L'Ï', "I"}, {L'Ì', "I"},
-    {L'Ñ', "N"}, {L'Ń', "N"},
-    {L'Ý', "Y"}, {L'Ÿ', "Y"}, {L'Ź', "Z"}, {L'Ž', "Z"}, {L'Ż', "Z"}
-};
-
-
-    for (wchar_t c : wideStr) {
-        if (c < 128) {
-            asciiStr += static_cast<char>(c);
-        } else if (accents.find(c) != accents.end()) {
-            asciiStr += accents[c];
+        if (!normalized.empty() && normalized.back() == ' ') {
+            normalized.pop_back(); // Remove trailing space
         }
+        return normalized.c_str();
     }
 
-    return asciiStr.c_str();
-}
-
-const char* normalizeWhitespace(const char* str) {
-    static std::string normalized;
-    normalized.clear();
-    std::unique_copy(str, str + std::strlen(str), std::back_inserter(normalized),
-                     [](char a, char b) { return std::isspace(a) && std::isspace(b); });
-    return normalized.c_str();
-}
-
-const char* stripNonPrintable(const char* str) {
-    static std::string printableStr;
-    printableStr.clear();
-    while (*str) {
-        if (std::isprint((unsigned char)*str)) {
-            printableStr += *str;
+    const char* stripNonASCII(const char* str) {
+        static std::string utf8Result;
+        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+        std::wstring wideStr = converter.from_bytes(str);
+        utf8Result.clear();
+        for (wchar_t c : wideStr) {
+            if (c < 128) utf8Result += static_cast<char>(c);
         }
-        str++;
+        return utf8Result.c_str();
     }
-    return printableStr.c_str();
+
+    const char* stripNonPrintable(const char* str) {
+        static std::string printableStr;
+        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+        std::wstring wideStr = converter.from_bytes(str);
+        printableStr.clear();
+        for (wchar_t c : wideStr) {
+            if (std::isprint(static_cast<unsigned char>(c))) {
+                printableStr += converter.to_bytes(std::wstring(1, c));
+            }
+        }
+        return printableStr.c_str();
+    }
+
+    const char* removePunctuation(const char* str) {
+        static std::string result;
+        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+        std::wstring wideStr = converter.from_bytes(str);  // Convert UTF-8 string to wide string
+
+        // Remove punctuation using standard library calls
+        std::wstring noPunct;
+        std::remove_copy_if(wideStr.begin(), wideStr.end(), std::back_inserter(noPunct), 
+                            [](wchar_t c){ return std::ispunct(c); });
+
+        result = converter.to_bytes(noPunct);  // Convert wide string back to UTF-8
+        return result.c_str();
+    }
 }
 
-}
