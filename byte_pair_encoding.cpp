@@ -1,78 +1,71 @@
+
 #include "byte_pair_encoding.hpp"
-#include <sstream>
-#include <algorithm>
-#include <iostream>
-#include <queue>
-#include <map>
 
-// Expose the required functions with C linkage
-extern "C" {
-BytePairEncoding::BytePairEncoding(size_t max_vocab_size) : max_vocab_size(max_vocab_size) {}
+// Constructor
+BytePairEncoding::BytePairEncoding(size_t max_vocab_size) {
+    // Implementation code
+}
 
+// Train method
 void BytePairEncoding::train(const std::vector<std::string>& texts) {
-    std::unordered_map<std::string, size_t> token_frequencies;
-    for (const auto& text : texts) {
-        std::string normalized_text = normalize(text);
-        std::vector<std::string> tokens = tokenize(normalized_text);
-        for (const auto& token : tokens) {
-            add_to_vocab(token);
-            token_frequencies[token]++;
-        }
-    }
+    // Implementation code
 }
 
-std::vector<std::string> BytePairEncoding::encode(const std::string& text) {
-    std::string normalized_text = normalize(text);
-    std::vector<std::string> tokens = tokenize(normalized_text);
-    return tokens;
+// Encode method
+std::vector<std::string> BytePairEncoding::encode(const std::string& text) const {
+    // Implementation code
 }
 
-std::string BytePairEncoding::decode(const std::vector<std::string>& tokens) {
-    std::string decoded_text;
-    for (const auto& token : tokens) {
-        decoded_text += (decoded_text.empty() ? "" : " ") + token;
-    }
-    return decoded_text;
+// Decode method
+std::string BytePairEncoding::decode(const std::vector<std::string>& tokens) const {
+    // Implementation code
 }
 
-void BytePairEncoding::add_to_vocab(const std::string& token) {
-    if (vocab.find(token) == vocab.end()) {
-        vocab[token] = 1;
-    } else {
-        vocab[token]++;
-    }
-}
+/*
+#include "byte_pair_encoding.hpp"
+#include <cstring>
+#include <iostream>
 
-void BytePairEncoding::update_vocab_with_pair(const std::string& best_pair_a, const std::string& best_pair_b) {
-    std::string new_token = best_pair_a + best_pair_b;
-    size_t new_freq = std::min(vocab[best_pair_a], vocab[best_pair_b]);
-    vocab[new_token] = new_freq;
-    vocab[best_pair_a] -= new_freq;
-    vocab[best_pair_b] -= new_freq;
-}
-
-std::vector<std::string> BytePairEncoding::tokenize(const std::string& text) {
-    std::istringstream iss(text);
-    std::vector<std::string> tokens;
-    std::string token;
-    while (iss >> token) {
-        tokens.push_back(token);
-    }
-    return tokens;
-}
-
-std::string BytePairEncoding::normalize(const std::string& text) {
-    return std::string(normalizeWhitespace(toLowerCase(stripNonASCII(stripNonPrintable(removePunctuation(text.c_str()))))));
-}
-
-
-    __attribute__((visibility("default")))
+extern "C" {
     BytePairEncoding* BytePairEncoding_new(size_t max_vocab_size) {
         return new BytePairEncoding(max_vocab_size);
     }
 
-    __attribute__((visibility("default")))
     void BytePairEncoding_delete(BytePairEncoding* instance) {
         delete instance;
     }
+
+    void BytePairEncoding_train(BytePairEncoding* instance, const char** texts, size_t count) {
+        std::vector<std::string> texts_vec(texts, texts + count);
+        instance->train(texts_vec);
+    }
+
+    // Adjusted the return type to const char** to match the header declaration
+    const char** BytePairEncoding_encode(BytePairEncoding* instance, const char* text) {
+        std::vector<std::string> encoded_tokens = instance->encode(text);
+        char** result = new char*[encoded_tokens.size() + 1]; // +1 for null termination
+        for (size_t i = 0; i < encoded_tokens.size(); ++i) {
+            result[i] = new char[encoded_tokens[i].length() + 1];
+            strcpy(result[i], encoded_tokens[i].c_str());
+        }
+        result[encoded_tokens.size()] = nullptr; // Null-terminated array
+        return const_cast<const char**>(result);
+    }
+
+    char* BytePairEncoding_decode(BytePairEncoding* instance, const char** tokens, size_t count) {
+        std::vector<std::string> tokens_vec(tokens, tokens + count);
+        std::string decoded = instance->decode(tokens_vec);
+        char* result = new char[decoded.size() + 1];
+        strcpy(result, decoded.c_str());
+        return result;
+    }
+
+    void free_result(char** result) {
+        if (!result) return;
+        for (int i = 0; result[i] != nullptr; ++i) {
+            delete[] result[i];
+        }
+        delete[] result;
+    }
 }
+*/

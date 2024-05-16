@@ -4,7 +4,6 @@
             "name": "Mac",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/opt/homebrew/Cellar/icu4c/74.2/include/**"  // Add this line
             ],
             "defines": [],
             "macFrameworkPath": [
