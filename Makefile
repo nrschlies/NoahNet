@@ -1,11 +1,11 @@
-CXX=g++
-CXXFLAGS=-fPIC -Wall -Wextra -O2 -std=c++11 -arch x86_64
-LDFLAGS=-shared -arch x86_64
-TARGET_LIB=libtext_byte_pair_encoding.so
+CXX = g++
+CXXFLAGS = -fPIC -Wall -Wextra -O2 -std=c++11 -arch x86_64
+LDFLAGS = -shared -arch x86_64
+TARGET_LIB = libtext_byte_pair_encoding.so
 
 # Include all relevant source files here
-SRCS=byte_pair_encoding.cpp text_utils.cpp
-OBJS=$(SRCS:.cpp=.o)
+SRCS = byte_pair_encoding.cpp text_utils.cpp huffman.cpp
+OBJS = $(SRCS:.cpp=.o)
 
 .PHONY: all clean test
 
