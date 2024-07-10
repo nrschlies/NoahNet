@@ -3,9 +3,15 @@
 #include <cmath>
 #include <Eigen/Dense>
 #include <pthread.h>
+#include <memory>  // Include memory header for smart pointers
+
+
+// Add debug prints to trace the program's execution
+#define DEBUG_PRINT(x) std::cout << x << std::endl;
 
 // Positional Encoding
 std::vector<std::vector<float>> positional_encoding(int seq_len, int d_model) {
+    DEBUG_PRINT("Entering positional_encoding");
     std::vector<std::vector<float>> pos_enc(seq_len, std::vector<float>(d_model));
     for (int pos = 0; pos < seq_len; ++pos) {
         for (int i = 0; i < d_model; ++i) {
@@ -16,47 +22,97 @@ std::vector<std::vector<float>> positional_encoding(int seq_len, int d_model) {
             }
         }
     }
+    DEBUG_PRINT("Exiting positional_encoding");
     return pos_enc;
 }
 
 // Scaled Dot-Product Attention
 Eigen::MatrixXd scaled_dot_product_attention(const Eigen::MatrixXd& Q, const Eigen::MatrixXd& K, const Eigen::MatrixXd& V, double d_k) {
+    DEBUG_PRINT("Entering scaled_dot_product_attention");
+    DEBUG_PRINT("Q dimensions: " << Q.rows() << "x" << Q.cols());
+    DEBUG_PRINT("K dimensions: " << K.rows() << "x" << K.cols());
+    DEBUG_PRINT("V dimensions: " << V.rows() << "x" << V.cols());
+
     Eigen::MatrixXd scores = Q * K.transpose() / sqrt(d_k);
-    Eigen::MatrixXd softmax_scores = scores.array().exp() / scores.array().exp().rowwise().sum();
-    return softmax_scores * V;
+    DEBUG_PRINT("Scores dimensions: " << scores.rows() << "x" << scores.cols());
+
+    Eigen::MatrixXd exp_scores = scores.array().exp();
+    DEBUG_PRINT("Exp scores dimensions: " << exp_scores.rows() << "x" << exp_scores.cols());
+
+    Eigen::VectorXd sum_exp_scores = exp_scores.rowwise().sum();
+    DEBUG_PRINT("Sum exp scores dimensions: " << sum_exp_scores.rows() << "x" << sum_exp_scores.cols());
+
+    Eigen::MatrixXd softmax_scores = exp_scores.array().colwise() / sum_exp_scores.array();
+    DEBUG_PRINT("Softmax scores dimensions: " << softmax_scores.rows() << "x" << softmax_scores.cols());
+
+    Eigen::MatrixXd output = softmax_scores * V;
+    DEBUG_PRINT("Output dimensions: " << output.rows() << "x" << output.cols());
+
+    DEBUG_PRINT("Exiting scaled_dot_product_attention");
+    return output;
 }
 
 // Feed-Forward Neural Network
 Eigen::MatrixXd feed_forward(const Eigen::MatrixXd& input, const Eigen::MatrixXd& W1, const Eigen::MatrixXd& W2, const Eigen::VectorXd& b1, const Eigen::VectorXd& b2) {
+    DEBUG_PRINT("Entering feed_forward");
+    assert(input.cols() == W1.rows() && "Input columns must match W1 rows");
+    assert(W1.cols() == W2.rows() && "W1 columns must match W2 rows");
+    assert(W2.cols() == b2.size() && "W2 columns must match b2 size");
+
     Eigen::MatrixXd hidden = (input * W1).rowwise() + b1.transpose();
     hidden = hidden.array().max(0); // ReLU activation
     Eigen::MatrixXd output = (hidden * W2).rowwise() + b2.transpose();
+    DEBUG_PRINT("Exiting feed_forward");
     return output;
 }
 
 // Layer Normalization
 Eigen::MatrixXd layer_norm(const Eigen::MatrixXd& input, const Eigen::VectorXd& gamma, const Eigen::VectorXd& beta) {
+    DEBUG_PRINT("Entering layer_norm");
+    DEBUG_PRINT("Input dimensions: " << input.rows() << "x" << input.cols());
+    DEBUG_PRINT("Gamma dimensions: " << gamma.size());
+    DEBUG_PRINT("Beta dimensions: " << beta.size());
+
+    assert(input.cols() == gamma.size() && "Input columns must match gamma size");
+    assert(input.cols() == beta.size() && "Input columns must match beta size");
+
     Eigen::VectorXd mean = input.colwise().mean();
+    DEBUG_PRINT("Mean dimensions: " << mean.size());
+
     Eigen::VectorXd variance = ((input.rowwise() - mean.transpose()).array().square().colwise().mean()).matrix();
+    DEBUG_PRINT("Variance dimensions: " << variance.size());
+
     Eigen::MatrixXd norm = (input.rowwise() - mean.transpose()).array().rowwise() / variance.array().sqrt().transpose();
-    return norm.array().rowwise() * gamma.transpose().array() + beta.transpose().array();
+    DEBUG_PRINT("Norm dimensions: " << norm.rows() << "x" << norm.cols());
+
+    Eigen::MatrixXd gamma_mat = gamma.transpose().replicate(input.rows(), 1);
+    Eigen::MatrixXd beta_mat = beta.transpose().replicate(input.rows(), 1);
+
+    Eigen::MatrixXd output = norm.array() * gamma_mat.array() + beta_mat.array();
+    DEBUG_PRINT("Output dimensions: " << output.rows() << "x" << output.cols());
+
+    DEBUG_PRINT("Exiting layer_norm");
+    return output;
 }
 
 // Multi-Head Attention with pthread
 class MultiHeadAttention {
 public:
     MultiHeadAttention(int num_heads, int d_model) : num_heads(num_heads), d_model(d_model), d_k(d_model / num_heads) {
+        DEBUG_PRINT("Entering MultiHeadAttention constructor");
         initialize_weights();
+        DEBUG_PRINT("Exiting MultiHeadAttention constructor");
     }
 
     Eigen::MatrixXd operator()(const Eigen::MatrixXd& Q, const Eigen::MatrixXd& K, const Eigen::MatrixXd& V) {
+        DEBUG_PRINT("Entering MultiHeadAttention operator()");
         std::vector<Eigen::MatrixXd> heads(num_heads);
         std::vector<pthread_t> threads(num_heads);
-        ThreadData data[num_heads];
+        std::vector<std::unique_ptr<ThreadData>> data;
 
         for (int i = 0; i < num_heads; ++i) {
-            data[i] = {i, Q, K, V, WQ[i], WK[i], WV[i], d_k, &heads[i]};
-            pthread_create(&threads[i], nullptr, &MultiHeadAttention::thread_func, (void*)&data[i]);
+            data.push_back(std::make_unique<ThreadData>(i, &Q, &K, &V, &WQ[i], &WK[i], &WV[i], d_k, &heads[i]));
+            pthread_create(&threads[i], nullptr, &MultiHeadAttention::thread_func, (void*)data[i].get());
         }
 
         for (int i = 0; i < num_heads; ++i) {
@@ -64,6 +120,7 @@ public:
         }
 
         Eigen::MatrixXd concat_heads = concatenate_heads(heads);
+        DEBUG_PRINT("Exiting MultiHeadAttention operator()");
         return concat_heads * WO;
     }
 
@@ -76,22 +133,43 @@ private:
 
     struct ThreadData {
         int head_idx;
-        const Eigen::MatrixXd& Q;
-        const Eigen::MatrixXd& K;
-        const Eigen::MatrixXd& V;
-        const Eigen::MatrixXd& WQ;
-        const Eigen::MatrixXd& WK;
-        const Eigen::MatrixXd& WV;
+        const Eigen::MatrixXd* Q;
+        const Eigen::MatrixXd* K;
+        const Eigen::MatrixXd* V;
+        const Eigen::MatrixXd* WQ;
+        const Eigen::MatrixXd* WK;
+        const Eigen::MatrixXd* WV;
         double d_k;
         Eigen::MatrixXd* head_output;
+
+        ThreadData(int head_idx, const Eigen::MatrixXd* Q, const Eigen::MatrixXd* K, const Eigen::MatrixXd* V, 
+                   const Eigen::MatrixXd* WQ, const Eigen::MatrixXd* WK, const Eigen::MatrixXd* WV, 
+                   double d_k, Eigen::MatrixXd* head_output) 
+            : head_idx(head_idx), Q(Q), K(K), V(V), WQ(WQ), WK(WK), WV(WV), d_k(d_k), head_output(head_output) {}
     };
 
     static void* thread_func(void* arg) {
         ThreadData* data = (ThreadData*)arg;
-        Eigen::MatrixXd Qi = data->Q * data->WQ;
-        Eigen::MatrixXd Ki = data->K * data->WK;
-        Eigen::MatrixXd Vi = data->V * data->WV;
+        DEBUG_PRINT("Thread " << data->head_idx << " starting");
+        assert(data->Q != nullptr && data->K != nullptr && data->V != nullptr);
+        assert(data->WQ != nullptr && data->WK != nullptr && data->WV != nullptr);
+
+        DEBUG_PRINT("Thread " << data->head_idx << " - Q dimensions: " << data->Q->rows() << "x" << data->Q->cols());
+        DEBUG_PRINT("Thread " << data->head_idx << " - WQ dimensions: " << data->WQ->rows() << "x" << data->WQ->cols());
+
+        Eigen::MatrixXd Qi = *(data->Q) * *(data->WQ);
+        Eigen::MatrixXd Ki = *(data->K) * *(data->WK);
+        Eigen::MatrixXd Vi = *(data->V) * *(data->WV);
+
+        DEBUG_PRINT("Thread " << data->head_idx << " - Qi dimensions: " << Qi.rows() << "x" << Qi.cols());
+        DEBUG_PRINT("Thread " << data->head_idx << " - Ki dimensions: " << Ki.rows() << "x" << Ki.cols());
+        DEBUG_PRINT("Thread " << data->head_idx << " - Vi dimensions: " << Vi.rows() << "x" << Vi.cols());
+
+        assert(Qi.cols() == Ki.cols() && "Qi and Ki must have the same number of columns");
+        assert(Qi.rows() == Vi.rows() && "Qi and Vi must have the same number of rows");
+
         *(data->head_output) = scaled_dot_product_attention(Qi, Ki, Vi, data->d_k);
+        DEBUG_PRINT("Thread " << data->head_idx << " finished");
         return nullptr;
     }
 
