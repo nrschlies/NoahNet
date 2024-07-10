@@ -295,6 +295,10 @@ int main() {
     int d_ff = 2048;
     int num_layers = 6;
 
+    // TODO: Add meaningful data (perhaps a noisy sine wave to start)
+
+    // TODO: Add input embedding matrix that is learnable
+
     // Create positional encoding
     auto pos_enc = positional_encoding(seq_len, d_model);
 
@@ -305,6 +309,12 @@ int main() {
     // Create target matrix (dummy data)
     Eigen::MatrixXd target(seq_len, d_model);
     target.setRandom();
+
+    // TODO: Add output embedding matrix that is learnable
+
+    // TODO: Reflect the autoregressive nature of the transformer (mask future tokens)
+
+    // TODO: Implement Stochastic Gradient Descent for Cross Entropy Loss
 
     // Create Transformer model
     Transformer transformer(d_model, num_heads, d_ff, num_layers);
