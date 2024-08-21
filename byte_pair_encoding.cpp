@@ -93,7 +93,7 @@ extern "C" {
                 std::strcpy(result[i], encoded_tokens[i].c_str());
             }
             result[encoded_tokens.size()] = nullptr; // Null-terminated array
-            return const_cast<const char**>(result);
+            return result;
         } catch (...) {
             for (size_t i = 0; i < encoded_tokens.size(); ++i) {
                 delete[] result[i];
