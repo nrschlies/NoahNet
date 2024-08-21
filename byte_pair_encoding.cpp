@@ -81,9 +81,17 @@ extern "C" {
         if (!instance || !text) return nullptr;
         std::vector<std::string> encoded_tokens = instance->encode(text);
         char** result = new char*[encoded_tokens.size() + 1];
+        if (!result) return nullptr; // Check if allocation was successful
         try {
             for (size_t i = 0; i < encoded_tokens.size(); ++i) {
                 result[i] = new char[encoded_tokens[i].length() + 1];
+                if (!result[i]) { // Check if allocation was successful
+                    for (size_t j = 0; j < i; ++j) {
+                        delete[] result[j];
+                    }
+                    delete[] result;
+                    return nullptr;
+                }
                 std::strcpy(result[i], encoded_tokens[i].c_str());
             }
             result[encoded_tokens.size()] = nullptr; // Null-terminated array
