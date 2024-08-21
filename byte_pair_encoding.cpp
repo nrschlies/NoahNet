@@ -81,7 +81,7 @@ extern "C" {
     const char** BytePairEncoding_encode(BytePairEncoding* instance, const char* text) {
         if (!instance || !text) return nullptr;
         std::vector<std::string> encoded_tokens = instance->encode(text);
-        char** result = new char*[encoded_tokens.size() + 1];
+        char** result = new char*[encoded_tokens.size() + 1]();
         for (size_t i = 0; i < encoded_tokens.size(); ++i) {
             result[i] = new char[encoded_tokens[i].length() + 1];
             std::strcpy(result[i], encoded_tokens[i].c_str());
