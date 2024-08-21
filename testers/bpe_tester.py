@@ -23,7 +23,7 @@ class BytePairEncoding:
         
     def encode(self, text):
         c_text = to_c_string(text)
-        bpe_lib.BytePairEncoding_encode.restype = ctypes.c_void_p  # Use c_void_p to get the raw pointer
+        bpe_lib.BytePairEncoding_encode.restype = ctypes.POINTER(ctypes.c_char_p)  # Use POINTER(c_char_p) to get the array of C strings
         encoded_tokens_ptr = bpe_lib.BytePairEncoding_encode(self.obj, c_text)
         
         # Convert from c_void_p to POINTER(c_char_p) to read the array
@@ -37,7 +37,7 @@ class BytePairEncoding:
             i += 1
         
         # Free the memory allocated in C++ (assuming free_result is properly implemented)
-        bpe_lib.free_result(encoded_tokens_ptr)
+        bpe_lib.free_result(ptr)
         return result
     
     def decode(self, tokens):
@@ -49,7 +49,7 @@ class BytePairEncoding:
         result = ctypes.string_at(decoded_text_ptr).decode('utf-8')
         
         # Free the allocated C string memory from C++ side
-        bpe_lib.free_result(decoded_text_ptr)
+        bpe_lib.free_result(ctypes.cast(decoded_text_ptr, ctypes.POINTER(ctypes.c_char_p)))
         return result
 
 # Set argument and result types for the C functions
@@ -68,7 +68,7 @@ bpe_lib.BytePairEncoding_encode.restype = ctypes.c_void_p  # Return type is void
 bpe_lib.BytePairEncoding_decode.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_char_p), ctypes.c_size_t]
 bpe_lib.BytePairEncoding_decode.restype = ctypes.c_char_p  # Return type is char* to C string
 
-bpe_lib.free_result.argtypes = [ctypes.c_void_p]
+bpe_lib.free_result.argtypes = [ctypes.POINTER(ctypes.c_char_p)]
 bpe_lib.free_result.restype = None
 
 # Example usage
