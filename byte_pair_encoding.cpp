@@ -4,10 +4,8 @@
 
 // Constructor
 BytePairEncoding::BytePairEncoding(size_t max_vocab_size) {
-    this->max_vocab_size = max_vocab_size;
-    // Initialize any necessary member variables or data structures here
-    // For example, you might initialize a vocabulary map
-    this->vocab = {};
+    max_vocab_size = max_vocab_size;
+    vocab = {};
 }
 
 // Train method
@@ -77,7 +75,7 @@ extern "C" {
         }
     }
 
-    const char** BytePairEncoding_encode(BytePairEncoding* instance, const char* text) {
+    char** BytePairEncoding_encode(BytePairEncoding* instance, const char* text) {
         if (!instance || !text) return nullptr;
         std::vector<std::string> encoded_tokens = instance->encode(text);
         char** result = new char*[encoded_tokens.size() + 1];
@@ -105,7 +103,7 @@ extern "C" {
         }
     }
 
-    char* BytePairEncoding_decode(BytePairEncoding* instance, const char** tokens, size_t count) {
+    char* BytePairEncoding_decode(BytePairEncoding* instance, char** tokens, size_t count) {
         if (!instance || !tokens) return nullptr;
         std::vector<std::string> tokens_vec(tokens, tokens + count);
         std::string decoded = instance->decode(tokens_vec);
