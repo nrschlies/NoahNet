@@ -1,10 +1,10 @@
 #include "byte_pair_encoding.hpp"
 #include <cstring>
+#include <unordered_map>
 #include <iostream>
 
 // Constructor
-BytePairEncoding::BytePairEncoding(size_t max_vocab_size) {
-    max_vocab_size = max_vocab_size;
+BytePairEncoding::BytePairEncoding(size_t max_vocab_size) : max_vocab_size(max_vocab_size) {
     vocab = {};
 }
 
@@ -12,21 +12,21 @@ BytePairEncoding::BytePairEncoding(size_t max_vocab_size) {
 void BytePairEncoding::train(const std::vector<std::string>& texts) {
     // Example training implementation
     for (const auto& text : texts) {
-        // Tokenize the text and update the vocabulary
-        // This is a placeholder for actual training logic
-        for (const char& ch : text) {
-            std::string token(1, ch);
-            if (vocab.find(token) == vocab.end()) {
-                vocab[token] = 1;
-            } else {
-                vocab[token]++;
+            // Tokenize the text and update the vocabulary
+            // This is a placeholder for actual training logic
+            for (const char& ch : text) {
+                std::string token(1, ch);
+                if (vocab.find(token) == vocab.end()) {
+                    vocab[token] = 1;
+                } else {
+                    vocab[token]++;
+                }
             }
         }
-    }
-    // Limit the vocabulary size to max_vocab_size
-    if (vocab.size() > max_vocab_size) {
-        // Placeholder for logic to reduce vocabulary size
-    }
+        // Limit the vocabulary size to max_vocab_size
+        if (vocab.size() > this->max_vocab_size) {
+            // Placeholder for logic to reduce vocabulary size
+        }
 }
 
 // Encode method
