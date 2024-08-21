@@ -1,6 +1,6 @@
 CXX = g++
-CXXFLAGS = -fPIC -Wall -Wextra -O2 -std=c++11 -arch x86_64
-LDFLAGS = -shared -arch x86_64
+CXXFLAGS = -fPIC -Wall -Wextra -O2 -std=c++11 -arch arm64
+LDFLAGS = -shared -arch arm64
 TARGET_LIB = libtext_byte_pair_encoding.so
 
 # Include all relevant source files here
