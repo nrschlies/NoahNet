@@ -22,26 +22,8 @@ public:
     // Additional functions related to the model can be declared here
 };
 
-// C-style interface for interaction with other languages or systems
-extern "C" {
-    // Create a new BytePairEncoding instance
-    BytePairEncoding* BytePairEncoding_new(size_t max_vocab_size);
-
-    // Delete an existing BytePairEncoding instance
-    void BytePairEncoding_delete(BytePairEncoding* instance);
-
-    // Train the BytePairEncoding instance with an array of texts
-    void BytePairEncoding_train(BytePairEncoding* instance, const char** texts, size_t count);
-
-    // Encode a text using the BytePairEncoding instance
-    // The return type matches the corrected function in your .cpp file
-    char** BytePairEncoding_encode(BytePairEncoding* instance, const char* text);
-
-    // Decode a list of tokens into a single string
-    char* BytePairEncoding_decode(BytePairEncoding* instance, char** tokens, size_t count);
-
-    // Utility function to free memory allocated by encode
-    void free_result(char** result);
-}
+private:
+    size_t max_vocab_size;
+    std::unordered_map<std::string, int> vocab;
 
 #endif // BYTE_PAIR_ENCODING_HPP
