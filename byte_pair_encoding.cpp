@@ -4,28 +4,60 @@
 
 // Constructor
 BytePairEncoding::BytePairEncoding(size_t max_vocab_size) {
-    (void)max_vocab_size; // Suppress unused parameter warning
+    this->max_vocab_size = max_vocab_size;
     // Initialize any necessary member variables or data structures here
+    // For example, you might initialize a vocabulary map
+    this->vocab = {};
 }
 
 // Train method
 void BytePairEncoding::train(const std::vector<std::string>& texts) {
-    (void)texts; // Suppress unused parameter warning
-    // Add your training implementation here
+    // Example training implementation
+    for (const auto& text : texts) {
+        // Tokenize the text and update the vocabulary
+        // This is a placeholder for actual training logic
+        for (const char& ch : text) {
+            std::string token(1, ch);
+            if (vocab.find(token) == vocab.end()) {
+                vocab[token] = 1;
+            } else {
+                vocab[token]++;
+            }
+        }
+    }
+    // Limit the vocabulary size to max_vocab_size
+    if (vocab.size() > max_vocab_size) {
+        // Placeholder for logic to reduce vocabulary size
+    }
 }
 
 // Encode method
 std::vector<std::string> BytePairEncoding::encode(const std::string& text) const {
-    (void)text; // Suppress unused parameter warning
-    // Add your encoding implementation here
-    return {"<encoded_token>"}; // Return a sample encoded token to ensure the function works
+    std::vector<std::string> encoded_tokens;
+    // Example encoding implementation
+    for (const char& ch : text) {
+        std::string token(1, ch);
+        if (vocab.find(token) != vocab.end()) {
+            encoded_tokens.push_back(token);
+        } else {
+            encoded_tokens.push_back("<unk>"); // Unknown token
+        }
+    }
+    return encoded_tokens;
 }
 
 // Decode method
 std::string BytePairEncoding::decode(const std::vector<std::string>& tokens) const {
-    (void)tokens; // Suppress unused parameter warning
-    // Add your decoding implementation here
-    return "<decoded_text>"; // Return a sample decoded text to ensure the function works
+    std::string decoded_text;
+    // Example decoding implementation
+    for (const auto& token : tokens) {
+        if (token != "<unk>") {
+            decoded_text += token;
+        } else {
+            decoded_text += "?"; // Placeholder for unknown token
+        }
+    }
+    return decoded_text;
 }
 
 // C-style interface
@@ -39,11 +71,15 @@ extern "C" {
     }
 
     void BytePairEncoding_train(BytePairEncoding* instance, const char** texts, size_t count) {
-        std::vector<std::string> texts_vec(texts, texts + count);
+        if (instance && texts) {
+            std::vector<std::string> texts_vec(texts, texts + count);
+            instance->train(texts_vec);
+        }
         instance->train(texts_vec);
     }
 
     const char** BytePairEncoding_encode(BytePairEncoding* instance, const char* text) {
+        if (!instance || !text) return nullptr;
         std::vector<std::string> encoded_tokens = instance->encode(text);
         char** result = new char*[encoded_tokens.size() + 1];
         for (size_t i = 0; i < encoded_tokens.size(); ++i) {
@@ -55,6 +91,7 @@ extern "C" {
     }
 
     char* BytePairEncoding_decode(BytePairEncoding* instance, const char** tokens, size_t count) {
+        if (!instance || !tokens) return nullptr;
         std::vector<std::string> tokens_vec(tokens, tokens + count);
         std::string decoded = instance->decode(tokens_vec);
         char* result = new char[decoded.size() + 1];
@@ -64,7 +101,7 @@ extern "C" {
 
     void free_result(char** result) {
         if (!result) return;
-        for (int i = 0; result[i] != nullptr; ++i) {
+        for (size_t i = 0; result[i] != nullptr; ++i) {
             delete[] result[i];
         }
         delete[] result;
