@@ -35,10 +35,10 @@ extern "C" {
 
     // Encode a text using the BytePairEncoding instance
     // The return type matches the corrected function in your .cpp file
-    const char** BytePairEncoding_encode(BytePairEncoding* instance, const char* text);
+    char** BytePairEncoding_encode(BytePairEncoding* instance, const char* text);
 
     // Decode a list of tokens into a single string
-    char* BytePairEncoding_decode(BytePairEncoding* instance, const char** tokens, size_t count);
+    char* BytePairEncoding_decode(BytePairEncoding* instance, char** tokens, size_t count);
 
     // Utility function to free memory allocated by encode
     void free_result(char** result);
