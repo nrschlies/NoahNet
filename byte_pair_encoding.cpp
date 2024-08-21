@@ -75,19 +75,26 @@ extern "C" {
             std::vector<std::string> texts_vec(texts, texts + count);
             instance->train(texts_vec);
         }
-        instance->train(texts_vec);
     }
 
     const char** BytePairEncoding_encode(BytePairEncoding* instance, const char* text) {
         if (!instance || !text) return nullptr;
         std::vector<std::string> encoded_tokens = instance->encode(text);
-        char** result = new char*[encoded_tokens.size() + 1]();
-        for (size_t i = 0; i < encoded_tokens.size(); ++i) {
-            result[i] = new char[encoded_tokens[i].length() + 1];
-            std::strcpy(result[i], encoded_tokens[i].c_str());
+        char** result = new char*[encoded_tokens.size() + 1];
+        try {
+            for (size_t i = 0; i < encoded_tokens.size(); ++i) {
+                result[i] = new char[encoded_tokens[i].length() + 1];
+                std::strcpy(result[i], encoded_tokens[i].c_str());
+            }
+            result[encoded_tokens.size()] = nullptr; // Null-terminated array
+            return const_cast<const char**>(result);
+        } catch (...) {
+            for (size_t i = 0; i < encoded_tokens.size(); ++i) {
+                delete[] result[i];
+            }
+            delete[] result;
+            return nullptr;
         }
-        result[encoded_tokens.size()] = nullptr; // Null-terminated array
-        return const_cast<const char**>(result);
     }
 
     char* BytePairEncoding_decode(BytePairEncoding* instance, const char** tokens, size_t count) {
