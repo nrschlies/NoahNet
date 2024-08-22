@@ -1,12 +1,19 @@
 import math
 import random
 import requests
+import time
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
 import json
 from config import API_EMAIL, API_TOKEN
 
 class FlightPathCalculator:
+    def __init__(self, max_retries=3, retry_delay=2, max_calls=None):
+        self.last_wind_vector = None
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        self.call_count = 0
+        self.max_calls = max_calls
     """
     A class to handle the calculation and optimization of flight paths considering Earth's curvature and wind vector fields.
     """
@@ -118,42 +125,23 @@ class FlightPathCalculator:
             raise e
 
     def adjust_for_wind(self, lat: float, lon: float, bearing: float, wind_vector: tuple) -> float:
-        """
-        Adjusts the flight path to account for wind vector fields at a given location.
-
-        :param lat: Latitude of the current coordinate in degrees.
-        :param lon: Longitude of the current coordinate in degrees.
-        :param bearing: Current bearing in degrees.
-        :param wind_vector: Wind vector as a tuple (speed in m/s, direction in degrees).
-        :return: Adjusted bearing in degrees considering wind effects.
-        """
         self.validate_coordinates(lat, lon)
-        if not (0 <= bearing < 360):
-            raise ValueError("Bearing must be in the range of 0 to 360 degrees.")
-        if len(wind_vector) != 2:
-            raise ValueError("Wind vector must be a tuple of two elements: (speed in m/s, direction in degrees).")
-
         wind_speed, wind_direction = wind_vector
-        if not isinstance(wind_speed, (int, float)) or not isinstance(wind_direction, (int, float)):
-            raise ValueError("Wind vector components must be numerical values.")
-        if not (0 <= wind_direction < 360):
-            raise ValueError("Wind direction must be in the range of 0 to 360 degrees.")
-        if wind_speed < 0:
-            raise ValueError("Wind speed cannot be negative.")
 
         try:
             bearing_rad = math.radians(bearing)
             wind_direction_rad = math.radians(wind_direction)
 
             wind_effect = wind_speed * math.sin(wind_direction_rad - bearing_rad)
-            adjusted_bearing_rad = bearing_rad + wind_effect / 1000
+            wind_effect_damped = wind_effect / 500  # Try halving the previous factor
+            
+            # Implement a check to limit the maximum bearing change
+            max_adjustment = 1  # max change in degrees, can be adjusted
+            adjusted_bearing_deg = min(max(bearing_rad + wind_effect_damped, bearing_rad - max_adjustment), bearing_rad + max_adjustment)
 
-            adjusted_bearing_deg = (math.degrees(adjusted_bearing_rad) + 360) % 360
+            adjusted_bearing_deg = (math.degrees(adjusted_bearing_deg) + 360) % 360
             return adjusted_bearing_deg
 
-        except ZeroDivisionError as e:
-            print("Error in adjust_for_wind: Division by zero detected.")
-            raise e
         except Exception as e:
             print(f"An unexpected error occurred in adjust_for_wind: {e}")
             raise e
@@ -198,53 +186,56 @@ class FlightPathCalculator:
             raise e
 
     def get_wind_vector(self, lat: float, lon: float) -> tuple:
-        """
-        Retrieves the wind vector (speed and direction) at a specific latitude and longitude.
-
-        :param lat: Latitude of the location in degrees.
-        :param lon: Longitude of the location in degrees.
-        :return: Wind vector as a tuple (speed in m/s, direction in degrees).
-        """
         self.validate_coordinates(lat, lon)
 
-        try:
-            # First, retrieve the metadata for the given latitude and longitude
-            api_endpoint = f"https://api.weather.gov/points/{lat},{lon}"
-            headers = {
-                "User-Agent": "Your App Name",
-                "Authorization": f"Bearer {API_TOKEN}",
-                "From": API_EMAIL
-            }
-            response = requests.get(api_endpoint, headers=headers)
-            response.raise_for_status()
+        if self.max_calls is not None and self.call_count >= self.max_calls:
+            print("Max number of wind vector calls reached.")
+            return self.last_wind_vector  # Return the last known value
 
-            metadata = response.json()
-            forecast_grid_url = metadata['properties']['forecastGridData']
+        retries = 0
 
-            # Now retrieve the grid data
-            grid_response = requests.get(forecast_grid_url, headers=headers)
-            grid_response.raise_for_status()
-            grid_data = grid_response.json()
+        while retries < self.max_retries:  # Ensure loop has a clear exit
+            try:
+                api_endpoint = f"https://api.weather.gov/points/{lat},{lon}"
+                headers = {
+                    "User-Agent": "Your App Name",
+                    "Authorization": f"Bearer {API_TOKEN}",
+                    "From": API_EMAIL
+                }
+                response = requests.get(api_endpoint, headers=headers)
+                response.raise_for_status()
 
-            # Extract wind speed and direction from the grid data
-            wind_speed = grid_data['properties']['windSpeed']['values'][0]['value']
-            wind_direction = grid_data['properties']['windDirection']['values'][0]['value']
+                metadata = response.json()
+                forecast_grid_url = metadata['properties']['forecastGridData']
 
-            # Print wind speed and direction to terminal
-            print(f"Wind speed: {wind_speed} m/s")
-            print(f"Wind direction: {wind_direction} degrees")
+                grid_response = requests.get(forecast_grid_url, headers=headers)
+                grid_response.raise_for_status()
+                grid_data = grid_response.json()
 
-            return wind_speed, wind_direction
+                wind_speed = grid_data['properties']['windSpeed']['values'][0]['value']
+                wind_direction = grid_data['properties']['windDirection']['values'][0]['value']
 
-        except requests.exceptions.RequestException as e:
-            print(f"Network error occurred while fetching wind data: {e}")
-            raise RuntimeError("Unable to retrieve wind vector data due to a network issue.")
-        except KeyError as e:
-            print(f"Unexpected data format received: {e}")
-            raise RuntimeError("Unexpected data format received from the wind data source.")
-        except Exception as e:
-            print(f"An unexpected error occurred in get_wind_vector: {e}")
-            raise e
+                print(f"Wind speed: {wind_speed} m/s")
+                print(f"Wind direction: {wind_direction} degrees")
+
+                self.last_wind_vector = (wind_speed, wind_direction)
+                self.call_count += 1
+
+                return wind_speed, wind_direction
+
+            except requests.exceptions.RequestException as e:
+                print(f"Network error occurred while fetching wind data: {e}")
+                retries += 1
+                if retries >= self.max_retries:
+                    print("Max retries reached. Using last known wind vector if available.")
+                    if self.last_wind_vector:
+                        return self.last_wind_vector
+                    else:
+                        raise RuntimeError("Unable to retrieve wind vector data due to a network issue.")
+                else:
+                    print(f"Retrying... ({retries}/{self.max_retries})")
+                    time.sleep(self.retry_delay)
+
 
     @staticmethod
     def _convert_wind_speed_to_mps(wind_speed_str: str) -> float:
@@ -282,49 +273,56 @@ class FlightPathCalculator:
             raise ValueError("Invalid wind direction format encountered.")
 
     def calculate_flight_path(self, lat1: float, lon1: float, lat2: float, lon2: float, sampling_rate: int) -> list:
-        """
-        Computes the flight path as a list of lat/long coordinates from the initial to the target coordinates,
-        considering Earth's curvature and wind fields.
-
-        :param lat1: Latitude of the initial coordinate in degrees.
-        :param lon1: Longitude of the initial coordinate in degrees.
-        :param lat2: Latitude of the target coordinate in degrees.
-        :param lon2: Longitude of the target coordinate in degrees.
-        :param sampling_rate: Number of points to sample along the path.
-        :return: List of tuples containing lat/long coordinates representing the flight path.
-        """
         self.validate_coordinates(lat1, lon1)
         self.validate_coordinates(lat2, lon2)
         if sampling_rate <= 0:
             raise ValueError("Sampling rate must be a positive integer.")
 
-        try:
-            initial_bearing = self.calculate_initial_bearing(lat1, lon1, lat2, lon2)
-            total_distance = self.calculate_distance(lat1, lon1, lat2, lon2)
-            step_distance = total_distance / sampling_rate
+        initial_bearing = self.calculate_initial_bearing(lat1, lon1, lat2, lon2)
+        total_distance = self.calculate_distance(lat1, lon1, lat2, lon2)
+        step_distance = total_distance / sampling_rate
 
-            flight_path = [(lat1, lon1)]
-            current_lat, current_lon = lat1, lon1
-            current_bearing = initial_bearing
+        flight_path = [(lat1, lon1)]
+        current_lat, current_lon = lat1, lon1
+        current_bearing = initial_bearing
+        previous_distance_to_target = total_distance
 
-            for i in range(1, sampling_rate):
-                wind_speed, wind_direction = self.get_wind_vector(current_lat, current_lon)
-                adjusted_bearing = self.adjust_for_wind(current_lat, current_lon, current_bearing, (wind_speed, wind_direction))
+        wind_data_cache = None
+        self.call_count = 0
+
+        for i in range(1, sampling_rate):
+            # Fetch wind data once and reuse unless very far from the initial point
+            if wind_data_cache is None:
+                try:
+                    wind_speed, wind_direction = self.get_wind_vector(current_lat, current_lon)
+                    wind_data_cache = (wind_speed, wind_direction)
+                except RuntimeError:
+                    print(f"Failed to fetch wind vector at point {i}; using last known value.")
+                    wind_speed, wind_direction = wind_data_cache
+            else:
+                wind_speed, wind_direction = wind_data_cache
+
+            # Adjust bearing for wind
+            adjusted_bearing = self.adjust_for_wind(current_lat, current_lon, current_bearing, (wind_speed, wind_direction))
+            next_lat, next_lon = self.calculate_next_point(current_lat, current_lon, adjusted_bearing, step_distance)
+
+            # Calculate the new distance to the target
+            new_distance_to_target = self.calculate_distance(next_lat, next_lon, lat2, lon2)
+
+            # Check if the new point moves us closer to the target; otherwise, reverse the adjustment
+            if new_distance_to_target >= previous_distance_to_target:
+                print(f"Adjustment increased distance to target; reverting to previous bearing at iteration {i}.")
+                adjusted_bearing = current_bearing  # Revert to previous bearing
                 next_lat, next_lon = self.calculate_next_point(current_lat, current_lon, adjusted_bearing, step_distance)
+                new_distance_to_target = self.calculate_distance(next_lat, next_lon, lat2, lon2)
 
-                flight_path.append((next_lat, next_lon))
-                current_lat, current_lon = next_lat, next_lon
-                current_bearing = adjusted_bearing
+            flight_path.append((next_lat, next_lon))
+            current_lat, current_lon = next_lat, next_lon
+            current_bearing = adjusted_bearing
+            previous_distance_to_target = new_distance_to_target
 
-            flight_path.append((lat2, lon2))
-            return flight_path
-
-        except ZeroDivisionError as e:
-            print("Error in calculate_flight_path: Division by zero detected.")
-            raise e
-        except Exception as e:
-            print(f"An unexpected error occurred in calculate_flight_path: {e}")
-            raise e
+        flight_path.append((lat2, lon2))
+        return flight_path
 
     def optimize_flight_path(self, lat1: float, lon1: float, lat2: float, lon2: float, sampling_rate: int) -> list:
         """
@@ -346,7 +344,7 @@ class FlightPathCalculator:
             best_path = None
             best_cost = float('inf')
             initial_flight_path = self.calculate_flight_path(lat1, lon1, lat2, lon2, sampling_rate)
-            optimization_iterations = 100
+            optimization_iterations = 2
 
             for _ in range(optimization_iterations):
                 perturbed_path = self._perturb_path(initial_flight_path)

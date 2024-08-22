@@ -1,17 +1,24 @@
 # FlightTester.py
 
 from FlightPathCalculator import FlightPathCalculator
+import json
 
+def load_city_coordinates(json_file):
+    with open(json_file, 'r') as f:
+        return json.load(f)
+    
 def main():
     # Initialize the FlightPathCalculator
     calculator = FlightPathCalculator()
 
+    city_coordinates = load_city_coordinates('city_coordinates.json')
+
     # Define the initial and target coordinates (latitude and longitude in degrees)
-    lat1, lon1 = 34.0522, -118.2437  # Los Angeles, CA
-    lat2, lon2 = 40.7128, -74.0060   # New York, NY
+    lat1, lon1 = city_coordinates['Seattle']
+    lat2, lon2 =  city_coordinates['New York']
 
     # Define the sampling rate (number of points along the path)
-    sampling_rate = 50
+    sampling_rate = 160
 
     # Calculate the optimized flight path
     try:
