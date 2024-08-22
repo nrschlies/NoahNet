@@ -133,13 +133,12 @@ class FlightPathCalculator:
             wind_direction_rad = math.radians(wind_direction)
 
             wind_effect = wind_speed * math.sin(wind_direction_rad - bearing_rad)
-            wind_effect_damped = wind_effect / 500  # Try halving the previous factor
-            
-            # Implement a check to limit the maximum bearing change
-            max_adjustment = 1  # max change in degrees, can be adjusted
-            adjusted_bearing_deg = min(max(bearing_rad + wind_effect_damped, bearing_rad - max_adjustment), bearing_rad + max_adjustment)
+            wind_effect_damped = wind_effect / 100  # Controlled adjustment factor
 
-            adjusted_bearing_deg = (math.degrees(adjusted_bearing_deg) + 360) % 360
+            # Gradual adjustment towards destination
+            adjusted_bearing_rad = bearing_rad + wind_effect_damped * 0.1  # Smaller adjustment steps
+            adjusted_bearing_deg = (math.degrees(adjusted_bearing_rad) + 360) % 360
+
             return adjusted_bearing_deg
 
         except Exception as e:
@@ -278,51 +277,35 @@ class FlightPathCalculator:
         if sampling_rate <= 0:
             raise ValueError("Sampling rate must be a positive integer.")
 
-        initial_bearing = self.calculate_initial_bearing(lat1, lon1, lat2, lon2)
-        total_distance = self.calculate_distance(lat1, lon1, lat2, lon2)
+        lat1_rad, lon1_rad, lat2_rad, lon2_rad = self.radians_from_degrees(lat1, lon1, lat2, lon2)
+        delta_lat = lat2_rad - lat1_rad
+        delta_lon = lon2_rad - lon1_rad
+        
+        a = math.sin(delta_lat / 2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon / 2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+        total_distance = 6371.0 * c  # Great-circle distance in kilometers
         step_distance = total_distance / sampling_rate
 
         flight_path = [(lat1, lon1)]
-        current_lat, current_lon = lat1, lon1
-        current_bearing = initial_bearing
-        previous_distance_to_target = total_distance
-
-        wind_data_cache = None
-        self.call_count = 0
-
+        
         for i in range(1, sampling_rate):
-            # Fetch wind data once and reuse unless very far from the initial point
-            if wind_data_cache is None:
-                try:
-                    wind_speed, wind_direction = self.get_wind_vector(current_lat, current_lon)
-                    wind_data_cache = (wind_speed, wind_direction)
-                except RuntimeError:
-                    print(f"Failed to fetch wind vector at point {i}; using last known value.")
-                    wind_speed, wind_direction = wind_data_cache
-            else:
-                wind_speed, wind_direction = wind_data_cache
-
-            # Adjust bearing for wind
-            adjusted_bearing = self.adjust_for_wind(current_lat, current_lon, current_bearing, (wind_speed, wind_direction))
-            next_lat, next_lon = self.calculate_next_point(current_lat, current_lon, adjusted_bearing, step_distance)
-
-            # Calculate the new distance to the target
-            new_distance_to_target = self.calculate_distance(next_lat, next_lon, lat2, lon2)
-
-            # Check if the new point moves us closer to the target; otherwise, reverse the adjustment
-            if new_distance_to_target >= previous_distance_to_target:
-                print(f"Adjustment increased distance to target; reverting to previous bearing at iteration {i}.")
-                adjusted_bearing = current_bearing  # Revert to previous bearing
-                next_lat, next_lon = self.calculate_next_point(current_lat, current_lon, adjusted_bearing, step_distance)
-                new_distance_to_target = self.calculate_distance(next_lat, next_lon, lat2, lon2)
-
-            flight_path.append((next_lat, next_lon))
-            current_lat, current_lon = next_lat, next_lon
-            current_bearing = adjusted_bearing
-            previous_distance_to_target = new_distance_to_target
-
+            fraction = i / sampling_rate
+            A = math.sin((1 - fraction) * c) / math.sin(c)
+            B = math.sin(fraction * c) / math.sin(c)
+            
+            x = A * math.cos(lat1_rad) * math.cos(lon1_rad) + B * math.cos(lat2_rad) * math.cos(lon2_rad)
+            y = A * math.cos(lat1_rad) * math.sin(lon1_rad) + B * math.cos(lat2_rad) * math.sin(lon2_rad)
+            z = A * math.sin(lat1_rad) + B * math.sin(lat2_rad)
+            
+            lat = math.atan2(z, math.sqrt(x**2 + y**2))
+            lon = math.atan2(y, x)
+            
+            flight_path.append((math.degrees(lat), math.degrees(lon)))
+        
         flight_path.append((lat2, lon2))
         return flight_path
+
 
     def optimize_flight_path(self, lat1: float, lon1: float, lat2: float, lon2: float, sampling_rate: int) -> list:
         """
@@ -401,7 +384,7 @@ class FlightPathCalculator:
             adjusted_bearing = self.adjust_for_wind(lat1, lon1, bearing, (wind_speed, wind_direction))
 
             wind_effect = abs(adjusted_bearing - bearing)
-            total_cost += distance + wind_effect
+            total_cost += (distance + wind_effect)*100
 
         return total_cost
 
