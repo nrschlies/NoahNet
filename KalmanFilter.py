@@ -5,6 +5,11 @@ class KalmanFilter:
     def __init__(self, initial_state: np.ndarray, initial_covariance: np.ndarray, 
                  transition_matrix: np.ndarray, observation_matrix: np.ndarray, 
                  process_noise: np.ndarray, observation_noise: np.ndarray):
+        """
+        Initializes the Kalman filter with the necessary matrices and initial conditions.
+        Ensures that matrices are correctly validated and the initial state is reasonable.
+        """
+        # Validate and set the matrices
         self._validate_matrices(initial_state, initial_covariance, transition_matrix, 
                                 observation_matrix, process_noise, observation_noise)
 
@@ -15,8 +20,11 @@ class KalmanFilter:
         self._initial_process_noise = process_noise.copy()
         self._initial_observation_noise = observation_noise.copy()
 
+        # Set initial state and covariance
         self.state = initial_state.copy().reshape(-1, 1)  # Ensure state is a column vector
         self.covariance = initial_covariance.copy()
+
+        # Set matrices
         self.transition_matrix = transition_matrix.copy()
         self.observation_matrix = observation_matrix.copy()
         self.process_noise = process_noise.copy()
@@ -24,6 +32,9 @@ class KalmanFilter:
 
     def _validate_matrices(self, initial_state, initial_covariance, transition_matrix, 
                            observation_matrix, process_noise, observation_noise):
+        """
+        Validates the input matrices for the Kalman filter.
+        """
         if not isinstance(initial_state, np.ndarray) or initial_state.ndim != 1:
             raise ValueError("initial_state must be a 1D numpy array.")
         if not isinstance(initial_covariance, np.ndarray) or initial_covariance.shape[0] != initial_covariance.shape[1]:
@@ -56,20 +67,25 @@ class KalmanFilter:
             raise ValueError("Mismatch in observation_noise dimensions related to observation dimension.")
 
     def _check_for_zeros_in_diagonal(self, matrix: np.ndarray, matrix_name: str):
+        """
+        Checks for zeros in the diagonal of a matrix to avoid division by zero.
+        """
         if np.any(np.diag(matrix) == 0):
             raise ValueError(f"{matrix_name} matrix contains zeros on the diagonal, which may lead to division by zero.")
 
-    def _validate_dimensions(self, matrix_a: np.ndarray, matrix_b: np.ndarray, operation: str):
-        if matrix_a.shape != matrix_b.shape:
-            raise ValueError(f"Dimension mismatch during {operation}: {matrix_a.shape} vs {matrix_b.shape}")
-
     def _safe_matrix_multiply(self, matrix_a: np.ndarray, matrix_b: np.ndarray) -> np.ndarray:
+        """
+        Safely multiplies two matrices, handling errors robustly.
+        """
         try:
             return np.dot(matrix_a, matrix_b)
         except Exception as e:
             raise RuntimeError(f"Matrix multiplication error: {str(e)}")
 
     def _safe_inverse_multiply(self, matrix_a: np.ndarray, matrix_b: np.ndarray) -> np.ndarray:
+        """
+        Safely computes the multiplication of a matrix with the inverse of another matrix.
+        """
         try:
             return np.dot(matrix_a, np.linalg.inv(matrix_b))
         except np.linalg.LinAlgError as e:
@@ -78,12 +94,19 @@ class KalmanFilter:
             raise RuntimeError(f"Unexpected error during matrix inversion: {str(e)}")
 
     def predict(self):
+        """
+        Performs the prediction step of the Kalman filter, updating the state estimation.
+        """
         self.state = self._safe_matrix_multiply(self.transition_matrix, self.state)
         self.covariance = self._safe_matrix_multiply(self.transition_matrix, self.covariance)
         self.covariance = self._safe_matrix_multiply(self.covariance, self.transition_matrix.T) + self.process_noise
         self._check_for_zeros_in_diagonal(self.covariance, "Predicted covariance")
 
     def update(self, measurement: np.ndarray):
+        """
+        Performs the update step of the Kalman filter using the new measurement 
+        to refine the state estimate and covariance.
+        """
         measurement = measurement.reshape(-1, 1)  # Ensure measurement is a column vector
         S = self._safe_matrix_multiply(self.observation_matrix, self.covariance)
         S = self._safe_matrix_multiply(S, self.observation_matrix.T) + self.observation_noise
@@ -99,6 +122,9 @@ class KalmanFilter:
         self._check_for_zeros_in_diagonal(self.covariance, "Updated covariance")
 
     def filter(self, measurements: list[np.ndarray]) -> list[np.ndarray]:
+        """
+        Applies the Kalman filter to a series of measurements, returning the filtered state estimates.
+        """
         filtered_states = []
         for measurement in measurements:
             self.predict()
@@ -107,6 +133,9 @@ class KalmanFilter:
         return filtered_states
 
     def reset(self):
+        """
+        Resets the Kalman filter to its initial state, useful for processing new sets of coordinates.
+        """
         self.state = self._initial_state.copy().reshape(-1, 1)
         self.covariance = self._initial_covariance.copy()
         self.transition_matrix = self._initial_transition_matrix.copy()
@@ -115,33 +144,54 @@ class KalmanFilter:
         self.observation_noise = self._initial_observation_noise.copy()
 
     def set_transition_matrix(self, transition_matrix: np.ndarray):
+        """
+        Sets or updates the transition matrix used in the prediction step.
+        """
         self._check_for_zeros_in_diagonal(transition_matrix, "Transition")
         self.transition_matrix = transition_matrix.copy()
 
     def set_observation_matrix(self, observation_matrix: np.ndarray):
+        """
+        Sets or updates the observation matrix used in the update step.
+        """
         if observation_matrix.shape[1] != self.state.shape[0]:
             raise ValueError("Observation matrix dimensions must match the state dimension.")
         self.observation_matrix = observation_matrix.copy()
 
     def set_process_noise(self, process_noise: np.ndarray):
+        """
+        Sets or updates the process noise covariance matrix.
+        """
         self._check_for_zeros_in_diagonal(process_noise, "Process noise")
         self.process_noise = process_noise.copy()
 
     def set_observation_noise(self, observation_noise: np.ndarray):
+        """
+        Sets or updates the observation noise covariance matrix.
+        """
         self._check_for_zeros_in_diagonal(observation_noise, "Observation noise")
         self.observation_noise = observation_noise.copy()
 
     def get_state_estimate(self) -> np.ndarray:
+        """
+        Returns the current state estimate after prediction and update steps.
+        """
         if not np.isfinite(self.state).all():
             raise ValueError("State estimate contains invalid values (NaN or infinity).")
         return self.state.flatten()
 
     def get_covariance(self) -> np.ndarray:
+        """
+        Returns the current covariance estimate after prediction and update steps.
+        """
         if not np.isfinite(self.covariance).all():
             raise ValueError("Covariance matrix contains invalid values (NaN or infinity).")
         return self.covariance
 
     def _convert_coordinates_to_state_vector(self, coordinates: list[tuple]) -> np.ndarray:
+        """
+        Converts a list of coordinates into a state vector for processing by the Kalman filter.
+        """
         if not isinstance(coordinates, list) or len(coordinates) == 0:
             raise ValueError("Coordinates must be a non-empty list.")
         
@@ -156,6 +206,9 @@ class KalmanFilter:
         return state_vector.reshape(-1, 1)
 
     def _convert_state_vector_to_coordinates(self, state_vector: np.ndarray) -> list[tuple]:
+        """
+        Converts a state vector back into coordinates after filtering.
+        """
         if state_vector.ndim != 2 or state_vector.shape[1] != 1:
             raise ValueError("State vector must be a 2D numpy array with one column.")
         
@@ -166,6 +219,9 @@ class KalmanFilter:
         return coordinates
 
     def plot_results(self, original_coordinates: list[tuple], filtered_coordinates: list[tuple]):
+        """
+        Visualizes the original and filtered coordinates on a map or graph.
+        """
         if len(original_coordinates) != len(filtered_coordinates):
             raise ValueError("Original and filtered coordinates lists must be of the same length.")
         

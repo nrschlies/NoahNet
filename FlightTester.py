@@ -113,10 +113,10 @@ def main():
 
     # Define the initial and target coordinates (latitude and longitude in degrees)
     lat1, lon1 = city_coordinates['Seattle']
-    lat2, lon2 = city_coordinates['London']
+    lat2, lon2 = city_coordinates['Los Angeles']
 
     # Define the sampling rate (number of points along the path)
-    sampling_rate = 16
+    sampling_rate = 32
 
     # Calculate the optimized flight path
     try:
